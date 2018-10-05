@@ -2,7 +2,8 @@
 
 import UIKit
 
-enum Currency{
+enum Currency {
+    
     case USD
     case EUR
     case AUD
@@ -15,249 +16,221 @@ enum Currency{
     case CHF
 }
 
-struct ExchangeRate: Hashable{
+struct ExchangeRate: Hashable {
+    
     let currencyOne: Currency
     let currencyTwo: Currency
     let rate: Float
     
-    var inverseRate: Float{
-        get{
+    var inverseRate: Float {
+        get {
             return 1/rate
         }
     }
     
-    var hashValue: Int{
-        get{
+    var hashValue: Int {
+        get {
             return "\(self)".hashValue
         }
     }
 }
 
-func ==(lhs:ExchangeRate, rhs: ExchangeRate)->Bool{
+func ==(lhs:ExchangeRate, rhs: ExchangeRate)->Bool {
     return lhs.hashValue == rhs.hashValue
 }
 
-struct Money: Comparable{
+struct Money: Comparable {
+    
     let money: (NSDecimalNumber, Currency)
-    static let decimalHandler = NSDecimalNumberHandler(roundingMode: .RoundDown, scale: 2, raiseOnExactness: true, raiseOnOverflow: true, raiseOnUnderflow: true, raiseOnDivideByZero: true)
+    static let decimalHandler = NSDecimalNumberHandler(roundingMode: .down, scale: 2, raiseOnExactness: true, raiseOnOverflow: true, raiseOnUnderflow: true, raiseOnDivideByZero: true)
     
-    init(amt: Float, currency: Currency){
-        money = (NSDecimalNumber(float: amt), currency)
-        
+    init(amt: Float, currency: Currency) {
+        money = (NSDecimalNumber(value: amt), currency)
     }
     
-    init(amt: NSDecimal, currency: Currency){
+    init(amt: Decimal, currency: Currency) {
         money = (NSDecimalNumber(decimal: amt), currency)
-        
     }
     
-    init(amt: Double, currency: Currency){
-        money = (NSDecimalNumber(double: amt), currency)
-        
+    init(amt: Double, currency: Currency) {
+        money = (NSDecimalNumber(value: amt), currency)
     }
     
     var amount: Float {
-        get{
-            return money.0.decimalNumberByRoundingAccordingToBehavior(Money.decimalHandler).floatValue
+        get {
+            return money.0.rounding(accordingToBehavior: Money.decimalHandler).floatValue
         }
     }
     
-    var currency: Currency{
-        get{
+    var currency: Currency {
+        get {
             return money.1
         }
     }
 }
 
-
 extension Money {
+    
     static var exchange_rates: Set<ExchangeRate> = Set()
     
-    func pow(power: Int)->Money{
-        let _amt = money.0.decimalNumberByRaisingToPower(power, withBehavior: Money.decimalHandler)
+    func pow(power: Int)->Money {
+        
+        let _amt = money.0.raising(toPower: power, withBehavior: Money.decimalHandler)
         return Money(amt: _amt.floatValue, currency: currency)
     }
     
-    func amountIn(currency: Currency)->Money{
+    func amountIn(currency: Currency)->Money {
+        
         let curr_exchange_rate = Money.exchange_rates.filter { (er) -> Bool in
             return (er.currencyOne == self.currency && er.currencyTwo == currency) || (er.currencyTwo == self.currency && er.currencyOne == currency)
         }
-        
-        guard let er = curr_exchange_rate.first else{
+        guard let er = curr_exchange_rate.first else {
             return Money(amt: money.0.floatValue, currency: currency)
         }
-        
-        
-        if er.currencyOne == self.currency{
+        if er.currencyOne == self.currency {
             return Money(amt: self.money.0.floatValue * er.rate, currency: currency)
         }
         else{
             return Money(amt: self.money.0.floatValue * er.inverseRate, currency: currency)
         }
     }
-
 }
 
-
-extension Money: CustomStringConvertible{
+extension Money: CustomStringConvertible {
     var description: String {
-        get{
-            let _amt = money.0.decimalNumberByRoundingAccordingToBehavior(Money.decimalHandler)
+        get {
+            let _amt = money.0.rounding(accordingToBehavior: Money.decimalHandler)
             return "\(_amt) \(money.1)"
         }
     }
 }
 
-
-extension ExchangeRate: CustomStringConvertible{
+extension ExchangeRate: CustomStringConvertible {
     var description: String {
-        get{
+        get {
             return "\(currencyOne)-\(currencyTwo): \(rate)"
         }
     }
 }
 
-func ==(lhs:Money, rhs:Money)->Bool{
-   if lhs.money.0.compare(rhs.money.0) == .OrderedSame &&
-    lhs.currency == rhs.currency {
+func ==(lhs:Money, rhs:Money)->Bool {
+    if (lhs.money.0.compare(rhs.money.0) == .orderedSame) && (lhs.currency == rhs.currency) {
         return true
     }
-    
     return false
 }
 
-func <(lhs:Money, rhs:Money)->Bool{
-    if lhs.currency == rhs.currency && lhs.amount < rhs.amount{
+func <(lhs:Money, rhs:Money)->Bool {
+    if lhs.currency == rhs.currency && lhs.amount < rhs.amount {
         return true
     }
-    
     return false
 }
 
-
-func *(lhs: Money, rhs: Money)->Money{
-    if lhs.currency == rhs.currency{
-        let money = lhs.money.0.decimalNumberByMultiplyingBy(rhs.money.0)
-        
+func *(lhs: Money, rhs: Money)->Money {
+    if lhs.currency == rhs.currency {
+        let money = lhs.money.0.multiplying(by: rhs.money.0)
         return Money(amt: money.floatValue, currency: lhs.currency)
     }
-    
     return Money(amt: 0.0, currency: lhs.currency)
 }
 
-func *(lhs:Money, rhs: Float)->Money{
+func *(lhs:Money, rhs: Float)->Money {
     let amount = lhs.amount * rhs
     return Money(amt: amount, currency: lhs.currency)
 }
 
-func *(lhs:Float, rhs: Money)->Money{
+func *(lhs:Float, rhs: Money)->Money {
     let amount = lhs * rhs.amount
     return Money(amt: amount, currency: rhs.currency)
 }
 
-func /(lhs:Money, rhs:Money)->Money{
+func /(lhs:Money, rhs:Money)->Money {
     if lhs.currency == rhs.currency{
-        let money = lhs.money.0.decimalNumberByDividingBy(rhs.money.0)
-        
+        let money = lhs.money.0.dividing(by: rhs.money.0)
         return Money(amt: money.floatValue, currency: lhs.currency)
     }
-    
     return Money(amt: 0.0, currency: lhs.currency)
- 
 }
 
-func /(lhs:Money, rhs: Float)->Money{
-    if rhs != 0.00{
+func /(lhs:Money, rhs: Float)->Money {
+    if rhs != 0.00 {
         let amount = lhs.amount / rhs
         return Money(amt: amount, currency: lhs.currency)
     }
-    
     return Money(amt: 0.00, currency: lhs.currency)
 }
 
-func /(lhs:Float, rhs: Money)->Money{
-    if rhs.amount != 0.00{
+func /(lhs:Float, rhs: Money)->Money {
+    if rhs.amount != 0.00 {
         let amount = lhs / rhs.amount
         return Money(amt: amount, currency: rhs.currency)
     }
-    
     return Money(amt: 0.00, currency: rhs.currency)
 }
 
-
-func +(lhs:Money, rhs:Money)->Money{
-    if lhs.currency == rhs.currency{
-        let money = lhs.money.0.decimalNumberByAdding(rhs.money.0)
-        
+func +(lhs:Money, rhs:Money)->Money {
+    if lhs.currency == rhs.currency {
+        let money = lhs.money.0.adding(rhs.money.0)
         return Money(amt: money.floatValue, currency: lhs.currency)
     }
-    
     return Money(amt: 0.0, currency: lhs.currency)
-    
 }
 
-func +(lhs:Money, rhs: Float)->Money{
+func +(lhs:Money, rhs: Float)->Money {
     let amount = lhs.amount + rhs
     return Money(amt: amount, currency: lhs.currency)
 }
 
-func +(lhs:Float, rhs: Money)->Money{
+func +(lhs:Float, rhs: Money)->Money {
     let amount = lhs + rhs.amount
     return Money(amt: amount, currency: rhs.currency)
 }
 
-
-func -(lhs:Money, rhs:Money)->Money{
-    if lhs.currency == rhs.currency{
-        let money = lhs.money.0.decimalNumberBySubtracting(rhs.money.0)
-        
+func -(lhs:Money, rhs:Money)->Money {
+    if lhs.currency == rhs.currency {
+        let money = lhs.money.0.subtracting(rhs.money.0)
         return Money(amt: money.floatValue, currency: lhs.currency)
     }
-    
     return Money(amt: 0.0, currency: lhs.currency)
-    
 }
 
-func -(lhs:Money, rhs: Float)->Money{
+func -(lhs:Money, rhs: Float)->Money {
     let amount = lhs.amount - rhs
     return Money(amt: amount, currency: lhs.currency)
 }
 
-func -(lhs:Float, rhs: Money)->Money{
+func -(lhs:Float, rhs: Money)->Money {
     let amount = lhs - rhs.amount
     return Money(amt: amount, currency: rhs.currency)
 }
 
-func %(lhs:Money, rhs: Money)->Money{
+func %(lhs:Money, rhs: Money)->Money {
     if rhs.amount != 0.0 {
-        let amt = lhs.amount % rhs.amount
+        let amt = lhs.amount.truncatingRemainder(dividingBy: rhs.amount)
         return Money(amt: amt, currency: lhs.currency)
     }
-    
     return Money(amt: 0.0, currency: lhs.currency)
 }
 
-func %(lhs:Money, rhs: Float)->Money{
-    if rhs != 0.00{
-        let amount = lhs.amount % rhs
+func %(lhs:Money, rhs: Float)->Money {
+    if rhs != 0.00 {
+        let amount = lhs.amount.truncatingRemainder(dividingBy: rhs)
         return Money(amt: amount, currency: lhs.currency)
     }
-    
     return Money(amt: 0.00, currency: lhs.currency)
 }
 
-func %(lhs:Float, rhs: Money)->Money{
-    if rhs.amount != 0.00{
-        let amount = lhs % rhs.amount
+func %(lhs:Float, rhs: Money)->Money {
+    if rhs.amount != 0.00 {
+        let amount = lhs.truncatingRemainder(dividingBy: rhs.amount)
         return Money(amt: amount, currency: rhs.currency)
     }
-    
     return Money(amt: 0.00, currency: rhs.currency)
 }
 
-
 let usd_money = Money(amt: 10.02, currency: .USD)
-let cad_money = usd_money.amountIn(.CAD)
+let cad_money = usd_money.amountIn(currency: .CAD)
 usd_money.amount
 cad_money.currency
 
@@ -283,10 +256,9 @@ let usd_cad = ExchangeRate(currencyOne: .USD, currencyTwo: .CAD, rate: 1.328)
 Money.exchange_rates.insert(eur_usd)
 Money.exchange_rates.insert(usd_cad)
 
-let cad = usd_money.amountIn(.CAD)
-let usd = cad.amountIn(.USD)
-let eur = usd.amountIn(.EUR)
+let cad = usd_money.amountIn(currency: .CAD)
+let usd = cad.amountIn(currency: .USD)
+let eur = usd.amountIn(currency: .EUR)
 eur.amount
 usd.amount
 cad.amount
-
